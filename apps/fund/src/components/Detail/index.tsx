@@ -428,7 +428,7 @@ export default function Detail({ code }: Props) {
               const todayNav = latestDailyRows[0]?.date === todayStr ? latestDailyRows[0] : null
               const latestNav = latestDailyRows[0] ?? null
 
-              // 交易日：有净值用净值，否则用估值；非交易日：用最新净值（上一交易日）
+              // 优先展示今日净值，其次展示当前估值；都没有则回退到最新净值
               if (isWeekday) {
                 if (todayNav?.dwjz) {
                   return (
@@ -452,6 +452,16 @@ export default function Detail({ code }: Props) {
                         <>
                           {gz.gsz}
                           {gz.gszzl && <span className={pctClass(gz.gszzl)}> {pct(gz.gszzl)}</span>}
+                        </>
+                      ) : latestNav?.dwjz ? (
+                        <>
+                          {latestNav.dwjz}
+                          {latestNav.jzzzl && (
+                            <span className={pctClass(latestNav.jzzzl)}>
+                              {' '}
+                              {pct(latestNav.jzzzl)}
+                            </span>
+                          )}
                         </>
                       ) : (
                         '—'
@@ -545,7 +555,7 @@ export default function Detail({ code }: Props) {
                           {pct(quote?.prev_chg)}
                         </td>
                         <td className="num">
-                          {isTradeMinute() || isAfterClose() ? (
+                          {quote?.chg != null ? (
                             <span className={styles.chgGroup}>
                               <span className={pctClass(quote?.chg)}>{pct(quote?.chg)}</span>
                               {quote != null && (
@@ -555,7 +565,7 @@ export default function Detail({ code }: Props) {
                                     isTradeMinute() ? styles.liveTag : styles.closeTag
                                   )}
                                 >
-                                  {isTradeMinute() ? '实时' : '收盘'}
+                                  {isTradeMinute() ? '实时' : isAfterClose() ? '收盘' : '最新'}
                                 </span>
                               )}
                             </span>

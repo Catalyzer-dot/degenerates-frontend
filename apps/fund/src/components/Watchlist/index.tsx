@@ -76,8 +76,8 @@ function withDerivedChange(row: DailyRow | undefined, previous: DailyRow | undef
 }
 
 function getCurrentChange(gz: GzData | null | undefined, daily: DailyRow | null | undefined) {
-  // 优先：今日已有真实净值
-  if (daily?.dwjz && daily.date === getTodayDateString()) {
+  // 优先：已有真实净值涨跌
+  if (daily?.dwjz) {
     return {
       value: daily.jzzzl || '',
       label: '净值',
@@ -85,9 +85,8 @@ function getCurrentChange(gz: GzData | null | undefined, daily: DailyRow | null 
     }
   }
 
-  // 次选：今日有估值
-  const gzDate = gz?.gztime?.slice(0, 10)
-  if (gz?.gszzl && gzDate === getTodayDateString()) {
+  // 次选：有估值涨跌
+  if (gz?.gszzl) {
     return {
       value: gz.gszzl,
       label: '估值',
@@ -95,7 +94,6 @@ function getCurrentChange(gz: GzData | null | undefined, daily: DailyRow | null 
     }
   }
 
-  // 非交易日或数据未就绪 → 不显示
   return { value: '', label: '', time: '' }
 }
 
