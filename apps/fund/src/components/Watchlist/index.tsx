@@ -61,6 +61,10 @@ function getTodayDateString(): string {
   return `${year}-${month}-${day}`
 }
 
+function isTodayDate(value: string | null | undefined): boolean {
+  return !!value && value.slice(0, 10) === getTodayDateString()
+}
+
 function withDerivedChange(row: DailyRow | undefined, previous: DailyRow | undefined) {
   if (!row) return null
   if (row.jzzzl) return row
@@ -76,8 +80,8 @@ function withDerivedChange(row: DailyRow | undefined, previous: DailyRow | undef
 }
 
 function getCurrentChange(gz: GzData | null | undefined, daily: DailyRow | null | undefined) {
-  // 优先：已有真实净值涨跌
-  if (daily?.dwjz) {
+  // 优先：今日已有真实净值
+  if (daily?.dwjz && isTodayDate(daily.date)) {
     return {
       value: daily.jzzzl || '',
       label: '净值',
@@ -85,8 +89,8 @@ function getCurrentChange(gz: GzData | null | undefined, daily: DailyRow | null 
     }
   }
 
-  // 次选：有估值涨跌
-  if (gz?.gszzl) {
+  // 次选：今日有估值涨跌
+  if (gz?.gszzl && isTodayDate(gz.gztime)) {
     return {
       value: gz.gszzl,
       label: '估值',
@@ -130,15 +134,14 @@ function getCurrentValuationPrice(
   previousDaily: DailyRow | null | undefined
 ) {
   const currentNav = toNumber(daily?.dwjz)
-  if (currentNav != null) {
+  if (currentNav != null && isTodayDate(daily?.date)) {
     return {
       value: currentNav,
       date: daily?.date || '',
     }
   }
 
-  const gzDate = gz?.gztime?.slice(0, 10)
-  const estimatePrice = gzDate === getTodayDateString() ? toNumber(gz?.gsz) : null
+  const estimatePrice = isTodayDate(gz?.gztime) ? toNumber(gz?.gsz) : null
   if (estimatePrice != null) {
     return {
       value: estimatePrice,

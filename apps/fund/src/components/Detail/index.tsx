@@ -30,6 +30,18 @@ function toNumber(value: string | null | undefined): number | null {
   return Number.isFinite(numValue) ? numValue : null
 }
 
+function getTodayDateString(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function isTodayDate(value: string | null | undefined): boolean {
+  return !!value && value.slice(0, 10) === getTodayDateString()
+}
+
 function deriveDailyChange(latestValue: string, previousValue: string, fallback: string): string {
   if (fallback) {
     return fallback
@@ -424,11 +436,12 @@ export default function Detail({ code }: Props) {
             {(() => {
               const today = new Date()
               const isWeekday = today.getDay() >= 1 && today.getDay() <= 5
-              const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+              const todayStr = getTodayDateString()
               const todayNav = latestDailyRows[0]?.date === todayStr ? latestDailyRows[0] : null
               const latestNav = latestDailyRows[0] ?? null
+              const hasTodayEstimate = !!gz?.gsz && isTodayDate(gz?.gztime)
 
-              // 优先展示今日净值，其次展示当前估值；都没有则回退到最新净值
+              // 交易日：优先展示今日净值，其次展示今日估值；否则回退到最新净值
               if (isWeekday) {
                 if (todayNav?.dwjz) {
                   return (
@@ -444,16 +457,23 @@ export default function Detail({ code }: Props) {
                     </div>
                   )
                 }
+                if (hasTodayEstimate) {
+                  return (
+                    <div>
+                      <label>当前估值</label>
+                      <span>
+                        {gz.gsz}
+                        {gz.gszzl && <span className={pctClass(gz.gszzl)}> {pct(gz.gszzl)}</span>}
+                      </span>
+                      <span className="metaDate">{gz.gztime}</span>
+                    </div>
+                  )
+                }
                 return (
                   <div>
-                    <label>当前估值</label>
+                    <label>净值</label>
                     <span>
-                      {gz?.gsz ? (
-                        <>
-                          {gz.gsz}
-                          {gz.gszzl && <span className={pctClass(gz.gszzl)}> {pct(gz.gszzl)}</span>}
-                        </>
-                      ) : latestNav?.dwjz ? (
+                      {latestNav?.dwjz ? (
                         <>
                           {latestNav.dwjz}
                           {latestNav.jzzzl && (
@@ -467,9 +487,7 @@ export default function Detail({ code }: Props) {
                         '—'
                       )}
                     </span>
-                    {(gz?.jzrq || latestNav?.date) && (
-                      <span className="metaDate">{gz?.jzrq || latestNav?.date}</span>
-                    )}
+                    {latestNav?.date && <span className="metaDate">{latestNav.date}</span>}
                   </div>
                 )
               }
