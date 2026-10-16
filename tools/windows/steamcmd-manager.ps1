@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$AllowedOrigin = 'https://degenerates.site',
     [int]$Port = 17864
 )
@@ -53,10 +53,12 @@ if (Test-Path -LiteralPath $configPath) {
     $token = [Convert]::ToBase64String($randomBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
     $detectedSteamCmd = Find-DefaultSteamCmd
     $detectedInstallRoot = Find-DefaultInstallRoot $detectedSteamCmd
+    if (-not $detectedSteamCmd) { $detectedSteamCmd = '' }
+    if (-not $detectedInstallRoot) { $detectedInstallRoot = '' }
     $script:config = [pscustomobject]@{
         token = $token
-        steamCmdPath = if ($detectedSteamCmd) { $detectedSteamCmd } else { '' }
-        installRoot = if ($detectedInstallRoot) { $detectedInstallRoot } else { '' }
+        steamCmdPath = $detectedSteamCmd
+        installRoot = $detectedInstallRoot
         apps = @()
         job = $null
     }
@@ -192,7 +194,9 @@ function Read-AppManifest([string]$appManifestPath) {
     $nameMatch = [regex]::Match($text, '(?m)^\s*"name"\s+"([^"]+)"')
     $installdirMatch = [regex]::Match($text, '(?m)^\s*"installdir"\s+"([^"]+)"')
     if (-not $installdirMatch.Success) { return $null }
-    return @{ name = if ($nameMatch.Success) { $nameMatch.Groups[1].Value } else { '' }; folder = $installdirMatch.Groups[1].Value }
+    $name = ''
+    if ($nameMatch.Success) { $name = $nameMatch.Groups[1].Value }
+    return @{ name = $name; folder = $installdirMatch.Groups[1].Value }
 }
 
 function Resolve-AppInstall([int]$appId, [string]$folder) {
@@ -215,10 +219,8 @@ function Start-Update([int]$appId) {
     if ($resolved.folder) { Check-Folder $resolved.folder }
 
     $root = [IO.Path]::GetFullPath($script:config.installRoot).TrimEnd('\')
-    $target = if ($resolved.folder) { [IO.Path]::GetFullPath((Join-Path $root $resolved.folder)) } else { $null }
-    if (-not $target) {
-        $target = [IO.Path]::GetFullPath($script:config.installRoot)
-    }
+    $target = [IO.Path]::GetFullPath($script:config.installRoot)
+    if ($resolved.folder) { $target = [IO.Path]::GetFullPath((Join-Path $root $resolved.folder)) }
     if ($target -ne $root -and -not $target.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Install folder is outside the configured root.'
     }
@@ -238,7 +240,8 @@ function Start-Update([int]$appId) {
     $jobId = [guid]::NewGuid().ToString('N')
     $out = Join-Path $logDir "$jobId.out.log"
     $err = Join-Path $logDir "$jobId.err.log"
-    $args = if ($resolved.folder) { "+force_install_dir `"$target`" +login anonymous +app_update $appId +quit" } else { "+login anonymous +app_update $appId +quit" }
+    $args = "+login anonymous +app_update $appId +quit"
+    if ($resolved.folder) { $args = "+force_install_dir `"$target`" +login anonymous +app_update $appId +quit" }
     $script:steamProcess = Start-Process -FilePath $script:config.steamCmdPath -ArgumentList $args `
         -WorkingDirectory (Split-Path $script:config.steamCmdPath) -PassThru `
         -RedirectStandardOutput $out -RedirectStandardError $err
