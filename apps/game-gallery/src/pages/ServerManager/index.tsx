@@ -15,6 +15,8 @@ import {
 import styles from './index.module.scss'
 
 const jobLabels = { running: '正在下载或更新', succeeded: '更新完成', failed: '更新失败' }
+const managerDownloadVersion = '1.0.4'
+const managerDownloadFile = `steamcmd-manager-v${managerDownloadVersion}.zip`
 
 export function ServerManagerPage() {
   const [paired, setPaired] = useState(false)
@@ -145,12 +147,12 @@ export function ServerManagerPage() {
 
       <section className={styles.download}>
         <div>
-          <h2>Windows 管理程序</h2>
-          <p>在这台 Windows 云服务器上下载并解压，然后双击启动 BAT。首次启动会显示配对密钥。</p>
+          <h2>Windows 管理程序 v{state?.managerVersion ?? managerDownloadVersion}</h2>
+          <p>请下载对应版本并解压，然后双击启动 BAT。首次启动会显示配对密钥。</p>
         </div>
         <a
-          href={`${import.meta.env.BASE_URL}downloads/steamcmd-manager.zip`}
-          download="steamcmd-manager.zip"
+          href={`${import.meta.env.BASE_URL}downloads/${managerDownloadFile}`}
+          download={managerDownloadFile}
           className={styles.downloadLink}
         >
           下载 ZIP

@@ -1,5 +1,7 @@
 # Windows 本机 SteamCMD 管理程序
 
+当前版本：`1.0.4`。压缩包文件名：`steamcmd-manager-v1.0.4.zip`。
+
 此方案由 `game-gallery` 网页直接调用**同一台 Windows 机器**的 `127.0.0.1:17864`。网站后端无需部署新接口。只能在安装 SteamCMD 的 Windows 服务器的浏览器中使用下载和更新功能。
 
 1. 将 `steamcmd-manager.ps1` 和 `start-steamcmd-manager.bat` 复制到 Windows 服务器的同一目录。

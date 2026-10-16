@@ -4,6 +4,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
+$ManagerVersion = '1.0.4'
 $configPath = Join-Path $PSScriptRoot 'steamcmd-manager.json'
 $logDir = Join-Path $PSScriptRoot 'steamcmd-manager-logs'
 $script:steamProcess = $null
@@ -122,6 +123,7 @@ function Public-State {
         }
     }
     return @{
+        managerVersion = $ManagerVersion
         steamCmdPath = $script:config.steamCmdPath
         installRoot = $script:config.installRoot
         apps = @($script:config.apps)
@@ -259,6 +261,7 @@ $listener = New-Object Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$Port/")
 $listener.Start()
 Write-Host "SteamCMD manager listening on http://127.0.0.1:$Port/"
+Write-Host "SteamCMD manager version: $ManagerVersion"
 Write-Host "Open $AllowedOrigin/game-gallery/server-manager on this Windows machine."
 Write-Host "Pairing key: $($script:config.token)"
 

@@ -17,6 +17,7 @@ export interface ServerJob {
 }
 
 export interface ManagerState {
+  managerVersion: string
   steamCmdPath: string
   installRoot: string
   apps: ServerApp[]
