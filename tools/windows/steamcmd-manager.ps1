@@ -86,7 +86,8 @@ function Refresh-Job {
         $script:steamProcess.Dispose()
         $script:steamProcess = $null
         $marker = "Success! App '$($job.appId)' fully installed."
-        if ($exitCode -eq 0 -and $job.output.Contains($marker)) {
+        $alreadyUpToDate = $job.output -match "(?i)App '$($job.appId)' already up to date"
+        if ($exitCode -eq 0 -and ($job.output.Contains($marker) -or $alreadyUpToDate)) {
             $job.status = 'succeeded'
             if ($job.autoFolder) {
                 $app = @($script:config.apps | Where-Object { $_.appId -eq $job.appId }) | Select-Object -First 1
@@ -98,7 +99,7 @@ function Refresh-Job {
             }
         } else {
             $job.status = 'failed'
-            $job.output += "`nSteamCMD exit code: $exitCode"
+            if ($null -ne $exitCode) { $job.output += "`nSteamCMD exit code: $exitCode" }
         }
     } else {
         $old = Get-Process -Id $job.pid -ErrorAction SilentlyContinue
