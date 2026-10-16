@@ -79,6 +79,8 @@
   display: grid;
   width: min(430px, calc(100vw - 2.5rem));
   margin: 0;
+  background: #17172b;
+  backdrop-filter: none;
   visibility: hidden;
   opacity: 0;
   transform: translateY(-6px);
@@ -177,6 +179,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  margin: 1.25rem 0 1rem;
   color: #79d0a6;
 }
 .connection button {
