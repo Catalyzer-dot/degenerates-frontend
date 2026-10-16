@@ -5,6 +5,8 @@ export interface ServerApp {
   appId: number
   name: string
   folder: string
+  running?: boolean
+  executable?: string
 }
 
 export interface ServerJob {
@@ -86,3 +88,12 @@ export const deleteServerApp = (appId: number) =>
 
 export const updateServerApp = (appId: number) =>
   request<ManagerState>(`/apps/${appId}/update`, { method: 'POST' })
+
+export const startServerApp = (appId: number) =>
+  request<ManagerState>(`/apps/${appId}/start`, { method: 'POST' })
+
+export const stopServerApp = (appId: number) =>
+  request<ManagerState>(`/apps/${appId}/stop`, { method: 'POST' })
+
+export const restartServerApp = (appId: number) =>
+  request<ManagerState>(`/apps/${appId}/restart`, { method: 'POST' })

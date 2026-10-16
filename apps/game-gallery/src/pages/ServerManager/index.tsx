@@ -7,6 +7,9 @@ import {
   getManagerToken,
   saveManagerSettings,
   saveServerApp,
+  startServerApp,
+  stopServerApp,
+  restartServerApp,
   setManagerToken,
   updateServerApp,
   browseManagerPath,
@@ -15,7 +18,7 @@ import {
 import styles from './index.module.scss'
 
 const jobLabels = { running: '正在下载或更新', succeeded: '更新完成', failed: '更新失败' }
-const managerDownloadVersion = '1.0.5'
+const managerDownloadVersion = '1.0.6'
 const managerDownloadFile = `steamcmd-manager-v${managerDownloadVersion}.zip`
 
 export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) {
@@ -340,6 +343,47 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
                     >
                       下载／更新
                     </button>
+                    {app.running ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(
+                              () => stopServerApp(app.appId),
+                              `${app.name || app.appId} 已停止`
+                            )
+                          }
+                        >
+                          停止
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(
+                              () => restartServerApp(app.appId),
+                              `${app.name || app.appId} 已重启`
+                            )
+                          }
+                        >
+                          重启
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(
+                            () => startServerApp(app.appId),
+                            `${app.name || app.appId} 已启动`
+                          )
+                        }
+                      >
+                        启动
+                      </button>
+                    )}
                     <button
                       type="button"
                       className={styles.secondary}
@@ -355,6 +399,10 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
                     </button>
                   </div>
                 </div>
+                <p className={styles.serverStatus}>
+                  {app.running ? '● 服务运行中' : '○ 服务未运行'}
+                  {app.executable ? ` · ${app.executable}` : ''}
+                </p>
                 {state.job?.appId === app.appId && <p>最近任务：{jobLabels[state.job.status]}</p>}
               </article>
             ))}

@@ -4,10 +4,11 @@
 )
 
 $ErrorActionPreference = 'Stop'
-$ManagerVersion = '1.0.5'
+$ManagerVersion = '1.0.6'
 $configPath = Join-Path $PSScriptRoot 'steamcmd-manager.json'
 $logDir = Join-Path $PSScriptRoot 'steamcmd-manager-logs'
 $script:steamProcess = $null
+$script:serverProcesses = @{}
 
 function Find-DefaultSteamCmd {
     $candidates = @(
@@ -125,7 +126,13 @@ function Public-State {
         managerVersion = $ManagerVersion
         steamCmdPath = $script:config.steamCmdPath
         installRoot = $script:config.installRoot
-        apps = @($script:config.apps)
+        apps = @($script:config.apps | ForEach-Object {
+            $process = $null
+            if ($script:serverProcesses.ContainsKey([int]$_.appId)) { $process = Get-Process -Id $script:serverProcesses[[int]$_.appId] -ErrorAction SilentlyContinue }
+            $executable = $null
+            if ($process) { $executable = $process.Path }
+            [pscustomobject]@{ appId = $_.appId; name = $_.name; folder = $_.folder; running = ($null -ne $process); executable = $executable }
+        })
         job = $job
     }
 }
@@ -208,6 +215,51 @@ function Resolve-AppInstall([int]$appId, [string]$folder) {
     $manifest = Read-AppManifest (Join-Path $steamApps "appmanifest_$appId.acf")
     if ($manifest) { return @{ folder = $manifest.folder; manifest = $manifest } }
     return @{ folder = ''; manifest = $null }
+}
+
+function Find-ServerExecutable([string]$target) {
+    $files = @(Get-ChildItem -LiteralPath $target -Filter '*.exe' -File -Recurse -ErrorAction SilentlyContinue)
+    $preferred = $files | Where-Object { $_.Name -match '(?i)(server|dedicated|headless)' -and $_.Name -notmatch '(?i)(steamcmd|unins|crash|redist)' } | Select-Object -First 1
+    if ($preferred) { return $preferred.FullName }
+    if ($files.Count -eq 1) { return $files[0].FullName }
+    return $null
+}
+
+function Get-AppTarget([int]$appId) {
+    $app = @($script:config.apps | Where-Object { $_.appId -eq $appId }) | Select-Object -First 1
+    if (-not $app) { throw 'App ID is not configured.' }
+    Check-Settings $script:config.steamCmdPath $script:config.installRoot
+    $resolved = Resolve-AppInstall $appId ([string]$app.folder)
+    if (-not $resolved.folder) { throw '请先下载一次服务器，让管理程序识别安装文件夹。' }
+    Check-Folder $resolved.folder
+    $root = [IO.Path]::GetFullPath($script:config.installRoot).TrimEnd('\')
+    $target = [IO.Path]::GetFullPath((Join-Path $root $resolved.folder))
+    if (-not $target.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Install folder is outside the configured root.' }
+    if (-not (Test-Path -LiteralPath $target -PathType Container)) { throw 'Install folder does not exist. Download the server first.' }
+    return @{ app = $app; target = $target }
+}
+
+function Start-Server([int]$appId) {
+    $resolved = Get-AppTarget $appId
+    $existing = $null
+    if ($script:serverProcesses.ContainsKey($appId)) { $existing = Get-Process -Id $script:serverProcesses[$appId] -ErrorAction SilentlyContinue }
+    if ($existing) { throw 'Server is already running.' }
+    $exe = Find-ServerExecutable $resolved.target
+    if (-not $exe) { throw '找不到服务器可执行文件。请在安装目录中放置包含 server 或 dedicated 的 exe。' }
+    $process = Start-Process -FilePath $exe -WorkingDirectory $resolved.target -PassThru
+    $script:serverProcesses[$appId] = $process.Id
+    Save-Config
+}
+
+function Stop-Server([int]$appId) {
+    $resolved = Get-AppTarget $appId
+    $process = $null
+    if ($script:serverProcesses.ContainsKey($appId)) { $process = Get-Process -Id $script:serverProcesses[$appId] -ErrorAction SilentlyContinue }
+    if (-not $process) {
+        $process = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($resolved.target + '\', [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+    }
+    if ($process) { Stop-Process -Id $process.Id -Force }
+    $script:serverProcesses.Remove($appId)
 }
 
 function Start-Update([int]$appId) {
@@ -336,6 +388,16 @@ try {
                 Send-Json $context 200 (Public-State)
             } elseif ($path -match '^/api/apps/([1-9][0-9]*)/update$' -and $request.HttpMethod -eq 'POST') {
                 Start-Update ([int]$Matches[1])
+                Send-Json $context 200 (Public-State)
+            } elseif ($path -match '^/api/apps/([1-9][0-9]*)/start$' -and $request.HttpMethod -eq 'POST') {
+                Start-Server ([int]$Matches[1])
+                Send-Json $context 200 (Public-State)
+            } elseif ($path -match '^/api/apps/([1-9][0-9]*)/stop$' -and $request.HttpMethod -eq 'POST') {
+                Stop-Server ([int]$Matches[1])
+                Send-Json $context 200 (Public-State)
+            } elseif ($path -match '^/api/apps/([1-9][0-9]*)/restart$' -and $request.HttpMethod -eq 'POST') {
+                Stop-Server ([int]$Matches[1])
+                Start-Server ([int]$Matches[1])
                 Send-Json $context 200 (Public-State)
             } else {
                 Send-Json $context 404 @{ error = 'Unknown endpoint.' }
