@@ -8,6 +8,30 @@ $configPath = Join-Path $PSScriptRoot 'steamcmd-manager.json'
 $logDir = Join-Path $PSScriptRoot 'steamcmd-manager-logs'
 $script:steamProcess = $null
 
+function Find-DefaultSteamCmd {
+    $candidates = @(
+        (Join-Path $PSScriptRoot 'steamcmd.exe'),
+        (Join-Path $PSScriptRoot 'steamcmd\steamcmd.exe'),
+        (Join-Path $env:USERPROFILE 'Downloads\steamcmd\steamcmd.exe'),
+        (Join-Path $env:ProgramFiles 'SteamCMD\steamcmd.exe')
+    )
+    return $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+}
+
+function Find-DefaultInstallRoot([string]$steamCmdPath) {
+    if ($steamCmdPath) {
+        $steamRoot = Split-Path $steamCmdPath -Parent
+        $common = Join-Path $steamRoot 'steamapps\common'
+        if (Test-Path -LiteralPath $common -PathType Container) { return $common }
+    }
+    $candidates = @(
+        (Join-Path $PSScriptRoot 'steamapps\common'),
+        (Join-Path $env:USERPROFILE 'Downloads\steamcmd\steamapps\common'),
+        (Join-Path $env:ProgramFiles 'SteamCMD\steamapps\common')
+    )
+    return $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Container } | Select-Object -First 1
+}
+
 function Save-Config {
     $json = $script:config | ConvertTo-Json -Depth 8
     $tmp = "$configPath.tmp"
@@ -27,10 +51,12 @@ if (Test-Path -LiteralPath $configPath) {
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
     try { $rng.GetBytes($randomBytes) } finally { $rng.Dispose() }
     $token = [Convert]::ToBase64String($randomBytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+    $detectedSteamCmd = Find-DefaultSteamCmd
+    $detectedInstallRoot = Find-DefaultInstallRoot $detectedSteamCmd
     $script:config = [pscustomobject]@{
         token = $token
-        steamCmdPath = 'C:\Users\Administrator\Downloads\steamcmd\steamcmd.exe'
-        installRoot = 'C:\Users\Administrator\Downloads\steamcmd\steamapps\common'
+        steamCmdPath = if ($detectedSteamCmd) { $detectedSteamCmd } else { '' }
+        installRoot = if ($detectedInstallRoot) { $detectedInstallRoot } else { '' }
         apps = @()
         job = $null
     }
@@ -60,6 +86,14 @@ function Refresh-Job {
         $marker = "Success! App '$($job.appId)' fully installed."
         if ($exitCode -eq 0 -and $job.output.Contains($marker)) {
             $job.status = 'succeeded'
+            if ($job.autoFolder) {
+                $app = @($script:config.apps | Where-Object { $_.appId -eq $job.appId }) | Select-Object -First 1
+                $resolved = Resolve-AppInstall $job.appId ''
+                if ($app -and $resolved.manifest) {
+                    $app.folder = $resolved.manifest.folder
+                    if ([string]::IsNullOrWhiteSpace([string]$app.name) -and $resolved.manifest.name) { $app.name = $resolved.manifest.name }
+                }
+            }
         } else {
             $job.status = 'failed'
             $job.output += "`nSteamCMD exit code: $exitCode"
@@ -118,6 +152,22 @@ function Read-Body($request) {
     return $body | ConvertFrom-Json
 }
 
+function Browse-Path([string]$kind) {
+    Add-Type -AssemblyName System.Windows.Forms
+    if ($kind -eq 'steamcmd') {
+        $dialog = New-Object Windows.Forms.OpenFileDialog
+        $dialog.Filter = 'SteamCMD (steamcmd.exe)|steamcmd.exe|Executable (*.exe)|*.exe'
+        $dialog.Title = '选择 steamcmd.exe'
+        if ($dialog.ShowDialog() -eq [Windows.Forms.DialogResult]::OK) { return $dialog.FileName }
+        return $null
+    }
+    $dialog = New-Object Windows.Forms.FolderBrowserDialog
+    $dialog.Description = '选择游戏安装根目录（通常是 steamapps\common）'
+    $dialog.ShowNewFolderButton = $true
+    if ($dialog.ShowDialog() -eq [Windows.Forms.DialogResult]::OK) { return $dialog.SelectedPath }
+    return $null
+}
+
 function Check-Folder([string]$folder) {
     if ($folder -notmatch '^[A-Za-z0-9 _.-]{1,64}$' -or $folder -in @('.', '..') -or
         $folder.EndsWith('.') -or $folder.EndsWith(' ') -or
@@ -136,6 +186,23 @@ function Check-Settings([string]$steamCmdPath, [string]$installRoot) {
     }
 }
 
+function Read-AppManifest([string]$appManifestPath) {
+    if (-not (Test-Path -LiteralPath $appManifestPath -PathType Leaf)) { return $null }
+    $text = Get-Content -LiteralPath $appManifestPath -Raw -Encoding UTF8
+    $nameMatch = [regex]::Match($text, '(?m)^\s*"name"\s+"([^"]+)"')
+    $installdirMatch = [regex]::Match($text, '(?m)^\s*"installdir"\s+"([^"]+)"')
+    if (-not $installdirMatch.Success) { return $null }
+    return @{ name = if ($nameMatch.Success) { $nameMatch.Groups[1].Value } else { '' }; folder = $installdirMatch.Groups[1].Value }
+}
+
+function Resolve-AppInstall([int]$appId, [string]$folder) {
+    if ($folder) { return @{ folder = $folder; manifest = $null } }
+    $steamApps = Split-Path $script:config.installRoot -Parent
+    $manifest = Read-AppManifest (Join-Path $steamApps "appmanifest_$appId.acf")
+    if ($manifest) { return @{ folder = $manifest.folder; manifest = $manifest } }
+    return @{ folder = ''; manifest = $null }
+}
+
 function Start-Update([int]$appId) {
     Refresh-Job
     if ($script:config.job -and $script:config.job.status -eq 'running') {
@@ -144,11 +211,15 @@ function Start-Update([int]$appId) {
     $app = @($script:config.apps | Where-Object { $_.appId -eq $appId }) | Select-Object -First 1
     if ($null -eq $app) { throw 'App ID is not configured.' }
     Check-Settings $script:config.steamCmdPath $script:config.installRoot
-    Check-Folder $app.folder
+    $resolved = Resolve-AppInstall $appId ([string]$app.folder)
+    if ($resolved.folder) { Check-Folder $resolved.folder }
 
     $root = [IO.Path]::GetFullPath($script:config.installRoot).TrimEnd('\')
-    $target = [IO.Path]::GetFullPath((Join-Path $root $app.folder))
-    if (-not $target.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    $target = if ($resolved.folder) { [IO.Path]::GetFullPath((Join-Path $root $resolved.folder)) } else { $null }
+    if (-not $target) {
+        $target = [IO.Path]::GetFullPath($script:config.installRoot)
+    }
+    if ($target -ne $root -and -not $target.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Install folder is outside the configured root.'
     }
     if (Test-Path -LiteralPath $target) {
@@ -167,7 +238,7 @@ function Start-Update([int]$appId) {
     $jobId = [guid]::NewGuid().ToString('N')
     $out = Join-Path $logDir "$jobId.out.log"
     $err = Join-Path $logDir "$jobId.err.log"
-    $args = "+force_install_dir `"$target`" +login anonymous +app_update $appId +quit"
+    $args = if ($resolved.folder) { "+force_install_dir `"$target`" +login anonymous +app_update $appId +quit" } else { "+login anonymous +app_update $appId +quit" }
     $script:steamProcess = Start-Process -FilePath $script:config.steamCmdPath -ArgumentList $args `
         -WorkingDirectory (Split-Path $script:config.steamCmdPath) -PassThru `
         -RedirectStandardOutput $out -RedirectStandardError $err
@@ -175,7 +246,7 @@ function Start-Update([int]$appId) {
         id = $jobId; appId = $appId; status = 'running'
         startedAt = (Get-Date).ToUniversalTime().ToString('o')
         finishedAt = $null; output = ''; pid = $script:steamProcess.Id
-        stdoutPath = $out; stderrPath = $err
+        stdoutPath = $out; stderrPath = $err; autoFolder = [string]::IsNullOrWhiteSpace([string]$app.folder)
     }
     Save-Config
 }
@@ -219,6 +290,11 @@ try {
             $path = $request.Url.AbsolutePath.TrimEnd('/')
             if ($request.HttpMethod -eq 'GET' -and $path -eq '/api/state') {
                 Send-Json $context 200 (Public-State)
+            } elseif ($request.HttpMethod -eq 'GET' -and $path -eq '/api/browse') {
+                $kind = [string]$context.Request.QueryString['kind']
+                if ($kind -notin @('folder', 'steamcmd')) { throw 'Invalid browse kind.' }
+                $selected = Browse-Path $kind
+                Send-Json $context 200 @{ path = $selected }
             } elseif ($request.HttpMethod -eq 'PUT' -and $path -eq '/api/settings') {
                 Refresh-Job
                 if ($script:config.job -and $script:config.job.status -eq 'running') { throw 'Cannot change folders during an update.' }
@@ -232,11 +308,11 @@ try {
                 $body = Read-Body $request
                 $id = [string]$body.appId
                 if ($id -notmatch '^[1-9][0-9]{0,9}$' -or [long]$id -gt [int]::MaxValue) { throw 'Invalid App ID.' }
-                $appName = [string]$body.name
-                $folder = [string]$body.folder
-                if ([string]::IsNullOrWhiteSpace($appName) -or $appName.Length -gt 100) { throw 'Invalid game name.' }
-                Check-Folder $folder
-                $other = @($script:config.apps | Where-Object { $_.folder -ieq $folder -and $_.appId -ne [int]$id })
+                $appName = ([string]$body.name).Trim()
+                $folder = ([string]$body.folder).Trim()
+                if ($appName.Length -gt 100) { throw 'Invalid game name.' }
+                if ($folder) { Check-Folder $folder }
+                $other = @($script:config.apps | Where-Object { $folder -and $_.folder -ieq $folder -and $_.appId -ne [int]$id })
                 if ($other.Count -gt 0) { throw 'This folder is already assigned to another App ID.' }
                 $script:config.apps = @($script:config.apps | Where-Object { $_.appId -ne [int]$id }) + @([pscustomobject]@{ appId = [int]$id; name = $appName.Trim(); folder = $folder })
                 Save-Config

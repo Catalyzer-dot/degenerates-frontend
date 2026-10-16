@@ -62,8 +62,12 @@ export const getManagerState = () => request<ManagerState>('/state')
 export const saveManagerSettings = (settings: Pick<ManagerState, 'steamCmdPath' | 'installRoot'>) =>
   request<ManagerState>('/settings', { method: 'PUT', body: JSON.stringify(settings) })
 
-export const saveServerApp = (app: ServerApp) =>
-  request<ManagerState>('/apps', { method: 'POST', body: JSON.stringify(app) })
+export const saveServerApp = (
+  app: Pick<ServerApp, 'appId'> & Partial<Pick<ServerApp, 'name' | 'folder'>>
+) => request<ManagerState>('/apps', { method: 'POST', body: JSON.stringify(app) })
+
+export const browseManagerPath = (kind: 'folder' | 'steamcmd') =>
+  request<{ path: string | null }>(`/browse?kind=${kind}`)
 
 export const deleteServerApp = (appId: number) =>
   request<ManagerState>(`/apps/${appId}`, { method: 'DELETE' })

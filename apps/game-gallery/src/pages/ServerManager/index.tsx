@@ -9,6 +9,7 @@ import {
   saveServerApp,
   setManagerToken,
   updateServerApp,
+  browseManagerPath,
   type ManagerState,
 } from '../../services/serverManager'
 import styles from './index.module.scss'
@@ -91,6 +92,15 @@ export function ServerManagerPage() {
         saveManagerSettings({ steamCmdPath: steamCmdPath.trim(), installRoot: installRoot.trim() }),
       '目录已保存到 Windows 云服务器'
     )
+  }
+
+  async function browse(kind: 'folder' | 'steamcmd', setValue: (value: string) => void) {
+    try {
+      const result = await browseManagerPath(kind)
+      if (result.path) setValue(result.path)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '无法打开目录选择器')
+    }
   }
 
   async function saveApp(event: FormEvent<HTMLFormElement>) {
@@ -186,21 +196,37 @@ export function ServerManagerPage() {
             <h2>安装目录</h2>
             <label>
               SteamCMD 路径
-              <input
-                value={steamCmdPath}
-                onChange={(event) => setSteamCmdPath(event.target.value)}
-                required
-                placeholder="C:\Users\Administrator\Downloads\steamcmd\steamcmd.exe"
-              />
+              <div className={styles.pathInput}>
+                <input
+                  value={steamCmdPath}
+                  onChange={(event) => setSteamCmdPath(event.target.value)}
+                  placeholder="自动识别，或选择 steamcmd.exe"
+                />
+                <button
+                  type="button"
+                  className={styles.browseButton}
+                  onClick={() => void browse('steamcmd', setSteamCmdPath)}
+                >
+                  浏览
+                </button>
+              </div>
             </label>
             <label>
               游戏安装根目录
-              <input
-                value={installRoot}
-                onChange={(event) => setInstallRoot(event.target.value)}
-                required
-                placeholder="C:\Users\Administrator\Downloads\steamcmd\steamapps\common"
-              />
+              <div className={styles.pathInput}>
+                <input
+                  value={installRoot}
+                  onChange={(event) => setInstallRoot(event.target.value)}
+                  placeholder="自动识别，或选择 steamapps\\common"
+                />
+                <button
+                  type="button"
+                  className={styles.browseButton}
+                  onClick={() => void browse('folder', setInstallRoot)}
+                >
+                  浏览
+                </button>
+              </div>
             </label>
             <button type="submit" disabled={busy || state?.job?.status === 'running'}>
               保存目录
@@ -214,9 +240,8 @@ export function ServerManagerPage() {
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                required
                 maxLength={100}
-                placeholder="雾锁王国"
+                placeholder="可选，下载后自动识别"
               />
             </label>
             <label>
@@ -234,13 +259,13 @@ export function ServerManagerPage() {
               <input
                 value={folder}
                 onChange={(event) => setFolder(event.target.value)}
-                required
                 maxLength={64}
-                placeholder="EnshroudedServer"
+                placeholder="可选，下载后自动识别"
               />
             </label>
             <p className={styles.hint}>
-              已有存档请使用现有服务器文件夹名；更新前先关闭游戏服务器。
+              只填写 App ID 即可下载；名称和文件夹会从 Steam
+              下载结果自动识别。已有存档可手动填写文件夹名；更新前先关闭游戏服务器。
             </p>
             <button type="submit" disabled={busy}>
               保存游戏
