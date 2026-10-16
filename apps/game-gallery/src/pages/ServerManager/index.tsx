@@ -21,7 +21,7 @@ import {
 import styles from './index.module.scss'
 
 const jobLabels = { running: '正在下载或更新', succeeded: '更新完成', failed: '更新失败' }
-const managerDownloadVersion = '1.0.8'
+const managerDownloadVersion = '1.0.9'
 const managerDownloadFile = `steamcmd-manager-v${managerDownloadVersion}.zip`
 
 export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) {

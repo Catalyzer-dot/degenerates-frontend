@@ -4,7 +4,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
-$ManagerVersion = '1.0.8'
+$ManagerVersion = '1.0.9'
 $configPath = Join-Path $PSScriptRoot 'steamcmd-manager.json'
 $logDir = Join-Path $PSScriptRoot 'steamcmd-manager-logs'
 $script:steamProcess = $null
@@ -48,6 +48,11 @@ function Save-Config {
 if (Test-Path -LiteralPath $configPath) {
     $script:config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if (-not $config.token) { throw 'Configuration has no pairing token.' }
+    foreach ($savedApp in @($script:config.apps)) {
+        if (-not ($savedApp.PSObject.Properties.Name -contains 'configFile')) {
+            $savedApp | Add-Member -MemberType NoteProperty -Name configFile -Value ''
+        }
+    }
 } else {
     $randomBytes = New-Object byte[] 32
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
@@ -257,7 +262,12 @@ function Browse-Config([int]$appId) {
     if ($dialog.ShowDialog() -ne [Windows.Forms.DialogResult]::OK) { return $null }
     $path = [IO.Path]::GetFullPath($dialog.FileName)
     if (-not $path.StartsWith($resolved.target + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '配置文件必须位于服务器安装目录内。' }
-    $resolved.app.configFile = $path.Substring($resolved.target.Length + 1)
+    $configFile = $path.Substring($resolved.target.Length + 1)
+    if ($resolved.app.PSObject.Properties.Name -contains 'configFile') {
+        $resolved.app.configFile = $configFile
+    } else {
+        $resolved.app | Add-Member -MemberType NoteProperty -Name configFile -Value $configFile
+    }
     Save-Config
     return $resolved.app.configFile
 }
