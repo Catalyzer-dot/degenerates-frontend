@@ -17,6 +17,32 @@
   color: var(--accent-light);
   text-decoration: none;
 }
+.download {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: rgba(20, 20, 40, 0.7);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 14px;
+}
+.download h2 {
+  margin: 0 0 0.35rem;
+}
+.download p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+.downloadLink {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  background: var(--accent-color, #7c3aed);
+  border-radius: 8px;
+  text-decoration: none;
+}
 .form,
 .card {
   background: rgba(20, 20, 40, 0.7);
@@ -130,6 +156,10 @@
   background: #164d3a;
 }
 @media (max-width: 600px) {
+  .download {
+    align-items: flex-start;
+    flex-direction: column;
+  }
   .cardTop {
     align-items: flex-start;
     flex-direction: column;

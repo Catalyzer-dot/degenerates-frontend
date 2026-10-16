@@ -133,6 +133,20 @@ export function ServerManagerPage() {
         </p>
       )}
 
+      <section className={styles.download}>
+        <div>
+          <h2>Windows 管理程序</h2>
+          <p>在这台 Windows 云服务器上下载并解压，然后双击启动 BAT。首次启动会显示配对密钥。</p>
+        </div>
+        <a
+          href={`${import.meta.env.BASE_URL}downloads/steamcmd-manager.zip`}
+          download="steamcmd-manager.zip"
+          className={styles.downloadLink}
+        >
+          下载 ZIP
+        </a>
+      </section>
+
       {!paired ? (
         <form className={styles.form} onSubmit={(event) => void pair(event)}>
           <h2>连接本机程序</h2>
