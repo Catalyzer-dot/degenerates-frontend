@@ -4,7 +4,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
-$ManagerVersion = '1.0.4'
+$ManagerVersion = '1.0.5'
 $configPath = Join-Path $PSScriptRoot 'steamcmd-manager.json'
 $logDir = Join-Path $PSScriptRoot 'steamcmd-manager-logs'
 $script:steamProcess = $null
@@ -86,9 +86,8 @@ function Refresh-Job {
         $exitCode = $script:steamProcess.ExitCode
         $script:steamProcess.Dispose()
         $script:steamProcess = $null
-        $marker = "Success! App '$($job.appId)' fully installed."
-        $alreadyUpToDate = $job.output -match "(?i)App '$($job.appId)' already up to date"
-        if ($exitCode -eq 0 -and ($job.output.Contains($marker) -or $alreadyUpToDate)) {
+        $successfulUpdate = $job.output -match "(?im)^\s*Success! App '$($job.appId)' (fully installed|already up to date)\.\s*$"
+        if (($null -eq $exitCode -or $exitCode -eq 0) -and $successfulUpdate) {
             $job.status = 'succeeded'
             if ($job.autoFolder) {
                 $app = @($script:config.apps | Where-Object { $_.appId -eq $job.appId }) | Select-Object -First 1
@@ -134,6 +133,7 @@ function Public-State {
 function Send-Json($context, [int]$status, $value) {
     $response = $context.Response
     $response.StatusCode = $status
+    $response.KeepAlive = $false
     $response.ContentType = 'application/json; charset=utf-8'
     $response.Headers['Cache-Control'] = 'no-store'
     $response.Headers['Vary'] = 'Origin'
@@ -248,6 +248,8 @@ function Start-Update([int]$appId) {
     $script:steamProcess = Start-Process -FilePath $script:config.steamCmdPath -ArgumentList $args `
         -WorkingDirectory (Split-Path $script:config.steamCmdPath) -PassThru `
         -RedirectStandardOutput $out -RedirectStandardError $err
+    # Keep a process handle so Windows can report ExitCode after it exits.
+    $null = $script:steamProcess.Handle
     $script:config.job = [pscustomobject]@{
         id = $jobId; appId = $appId; status = 'running'
         startedAt = (Get-Date).ToUniversalTime().ToString('o')
@@ -258,6 +260,7 @@ function Start-Update([int]$appId) {
 }
 
 $listener = New-Object Net.HttpListener
+$listener.IgnoreWriteExceptions = $true
 $listener.Prefixes.Add("http://127.0.0.1:$Port/")
 $listener.Start()
 Write-Host "SteamCMD manager listening on http://127.0.0.1:$Port/"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   clearManagerToken,
@@ -15,7 +15,7 @@ import {
 import styles from './index.module.scss'
 
 const jobLabels = { running: '正在下载或更新', succeeded: '更新完成', failed: '更新失败' }
-const managerDownloadVersion = '1.0.4'
+const managerDownloadVersion = '1.0.5'
 const managerDownloadFile = `steamcmd-manager-v${managerDownloadVersion}.zip`
 
 export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) {
@@ -30,8 +30,11 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const refreshingRef = useRef(false)
 
   const refresh = useCallback(async () => {
+    if (refreshingRef.current) return null
+    refreshingRef.current = true
     try {
       const next = await getManagerState()
       setState(next)
@@ -41,6 +44,8 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '连接失败')
       return null
+    } finally {
+      refreshingRef.current = false
     }
   }, [])
 
@@ -55,10 +60,10 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
   }, [refresh])
 
   useEffect(() => {
-    if (!paired) return
+    if (!paired || busy) return
     const timer = window.setInterval(() => void refresh(), 3000)
     return () => window.clearInterval(timer)
-  }, [paired, refresh])
+  }, [paired, busy, refresh])
 
   async function pair(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -97,11 +102,14 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
   }
 
   async function browse(kind: 'folder' | 'steamcmd', setValue: (value: string) => void) {
+    setBusy(true)
     try {
       const result = await browseManagerPath(kind)
       if (result.path) setValue(result.path)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '无法打开目录选择器')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -114,8 +122,13 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
     }
     if (
       await run(
-        () => saveServerApp({ appId: id, name: name.trim(), folder: folder.trim() }),
-        '游戏配置已保存'
+        () =>
+          saveServerApp({
+            appId: id,
+            name: name.trim() || undefined,
+            folder: folder.trim() || undefined,
+          }),
+        '游戏配置已保存，已显示在下方列表'
       )
     ) {
       setName('')
@@ -149,7 +162,13 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
 
       <section className={styles.download}>
         <div>
-          <h2>Windows 管理程序 v{state?.managerVersion ?? managerDownloadVersion}</h2>
+          <h2>Windows 管理程序 v{managerDownloadVersion}</h2>
+          {paired && (
+            <p>
+              当前连接版本：
+              {state?.managerVersion ? `v${state.managerVersion}` : '旧版（未提供版本号）'}
+            </p>
+          )}
           <p>请下载对应版本并解压，然后双击启动 BAT。首次启动会显示配对密钥。</p>
         </div>
         <a
@@ -283,9 +302,9 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
               <article key={app.appId} className={styles.card}>
                 <div className={styles.cardTop}>
                   <div>
-                    <h3>{app.name}</h3>
+                    <h3>{app.name || `App ID ${app.appId}`}</h3>
                     <p>
-                      App ID {app.appId} · {app.folder}
+                      App ID {app.appId} · {app.folder || '下载后自动识别安装文件夹'}
                     </p>
                   </div>
                   <div className={styles.actions}>

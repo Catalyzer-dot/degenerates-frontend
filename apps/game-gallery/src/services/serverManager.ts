@@ -17,7 +17,7 @@ export interface ServerJob {
 }
 
 export interface ManagerState {
-  managerVersion: string
+  managerVersion?: string
   steamCmdPath: string
   installRoot: string
   apps: ServerApp[]
@@ -39,23 +39,34 @@ export function clearManagerToken(): void {
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getManagerToken()
   if (!token) throw new Error('请先输入 Windows 本地程序显示的配对密钥')
-  let response: Response
+  const controller = new AbortController()
+  const timer = window.setTimeout(
+    () => controller.abort(),
+    path.startsWith('/browse') ? 120000 : 10000
+  )
   try {
-    response = await fetch(`${API}${path}`, {
+    const response = await fetch(`${API}${path}`, {
       ...init,
+      signal: controller.signal,
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
         'X-Manager-Token': token,
       },
     })
-  } catch {
+    const result = await response.json()
+    if (!response.ok) throw new Error(result?.error ?? `请求失败（${response.status}）`)
+    return result as T
+  } catch (cause) {
+    if (controller.signal.aborted)
+      throw new Error('本机程序响应超时，请确认目录选择窗口已关闭，然后重试连接。')
+    if (cause instanceof Error && !(cause instanceof TypeError)) throw cause
     throw new Error(
       '无法连接本机程序。请在 Windows 云服务器上运行管理程序，并允许浏览器访问本地网络。'
     )
+  } finally {
+    window.clearTimeout(timer)
   }
-  const result = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(result?.error ?? `请求失败（${response.status}）`)
-  return result as T
 }
 
 export const getManagerState = () => request<ManagerState>('/state')
