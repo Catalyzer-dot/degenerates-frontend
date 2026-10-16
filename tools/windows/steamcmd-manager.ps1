@@ -4,7 +4,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
-$ManagerVersion = '1.0.9'
+$ManagerVersion = '1.0.10'
 $configPath = Join-Path $PSScriptRoot 'steamcmd-manager.json'
 $logDir = Join-Path $PSScriptRoot 'steamcmd-manager-logs'
 $script:steamProcess = $null
@@ -132,8 +132,7 @@ function Public-State {
         steamCmdPath = $script:config.steamCmdPath
         installRoot = $script:config.installRoot
         apps = @($script:config.apps | ForEach-Object {
-            $process = $null
-            if ($script:serverProcesses.ContainsKey([int]$_.appId)) { $process = Get-Process -Id $script:serverProcesses[[int]$_.appId] -ErrorAction SilentlyContinue }
+            $process = Find-RunningServer ([int]$_.appId)
             $executable = $null
             if ($process) { $executable = $process.Path }
             [pscustomobject]@{ appId = $_.appId; name = $_.name; folder = $_.folder; running = ($null -ne $process); executable = $executable; configFile = $_.configFile }
@@ -244,6 +243,19 @@ function Get-AppTarget([int]$appId) {
     return @{ app = $app; target = $target }
 }
 
+function Find-RunningServer([int]$appId) {
+    $resolved = Get-AppTarget $appId
+    $target = $resolved.target
+    $tracked = $null
+    if ($script:serverProcesses.ContainsKey($appId)) { $tracked = Get-Process -Id $script:serverProcesses[$appId] -ErrorAction SilentlyContinue }
+    if ($tracked) { return $tracked }
+    $match = Get-CimInstance Win32_Process | Where-Object {
+        $_.ExecutablePath -and $_.ExecutablePath.StartsWith($target + '\', [StringComparison]::OrdinalIgnoreCase)
+    } | Select-Object -First 1
+    if ($match) { return Get-Process -Id $match.ProcessId -ErrorAction SilentlyContinue }
+    return $null
+}
+
 function Get-ConfigPath([int]$appId) {
     $resolved = Get-AppTarget $appId
     $app = $resolved.app
@@ -274,8 +286,7 @@ function Browse-Config([int]$appId) {
 
 function Start-Server([int]$appId) {
     $resolved = Get-AppTarget $appId
-    $existing = $null
-    if ($script:serverProcesses.ContainsKey($appId)) { $existing = Get-Process -Id $script:serverProcesses[$appId] -ErrorAction SilentlyContinue }
+    $existing = Find-RunningServer $appId
     if ($existing) { throw 'Server is already running.' }
     $exe = Find-ServerExecutable $resolved.target
     if (-not $exe) { throw '找不到服务器可执行文件。请在安装目录中放置包含 server 或 dedicated 的 exe。' }
@@ -286,12 +297,11 @@ function Start-Server([int]$appId) {
 
 function Stop-Server([int]$appId) {
     $resolved = Get-AppTarget $appId
-    $process = $null
-    if ($script:serverProcesses.ContainsKey($appId)) { $process = Get-Process -Id $script:serverProcesses[$appId] -ErrorAction SilentlyContinue }
-    if (-not $process) {
-        $process = Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($resolved.target + '\', [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
+    $process = Find-RunningServer $appId
+    if ($process) {
+        & taskkill.exe /PID $process.Id /T /F | Out-Null
+        if (Get-Process -Id $process.Id -ErrorAction SilentlyContinue) { Stop-Process -Id $process.Id -Force }
     }
-    if ($process) { Stop-Process -Id $process.Id -Force }
     $script:serverProcesses.Remove($appId)
 }
 
