@@ -83,9 +83,26 @@
 
   .mainTabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 0;
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 0.75rem;
+  }
+
+  .managerLink {
+    margin-left: auto;
+    align-self: center;
+    padding: 0.5rem 0.75rem;
+    color: var(--accent-light);
+    font-size: 0.9rem;
+    text-decoration: none;
+    border: 1px solid rgba(124, 58, 237, 0.35);
+    border-radius: 8px;
+    white-space: nowrap;
+
+    &:hover {
+      background: rgba(124, 58, 237, 0.15);
+    }
   }
 
   .mainTab {

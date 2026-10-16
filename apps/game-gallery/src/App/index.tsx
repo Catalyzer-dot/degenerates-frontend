@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useRef, useCallback } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Link, Routes, Route } from 'react-router-dom'
 import classNames from 'classnames'
 import { GameItem } from '../components/GameItem'
 import { SearchBar, type SearchResult } from '../components/SearchBar'
@@ -47,6 +47,9 @@ const Settings = lazy(() =>
 const TowerDefensePage = lazy(() =>
   import('../pages/TowerDefense').then((module) => ({ default: module.TowerDefensePage }))
 )
+const ServerManagerPage = lazy(() =>
+  import('../pages/ServerManager').then((module) => ({ default: module.ServerManagerPage }))
+)
 
 function App() {
   return (
@@ -63,6 +66,14 @@ function App() {
             }
           >
             <TowerDefensePage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/server-manager"
+        element={
+          <Suspense fallback={<div>加载中...</div>}>
+            <ServerManagerPage />
           </Suspense>
         }
       />
@@ -617,6 +628,9 @@ function HomePage() {
           <PlaygroundIcon size={18} />
           Playground
         </button>
+        <Link to="/server-manager" className={styles.managerLink}>
+          服务器管理
+        </Link>
       </div>
 
       {/* Status filters (only when Games tab active) */}

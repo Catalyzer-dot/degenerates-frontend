@@ -34,3 +34,8 @@ godot-editor/
 
 # Codex
 .codex/environments
+
+# Windows local SteamCMD manager secrets and logs
+tools/windows/steamcmd-manager.json
+tools/windows/steamcmd-manager.json.tmp
+tools/windows/steamcmd-manager-logs/

@@ -1,4 +1,5 @@
 import React from 'react'
+import { Link } from 'react-router-dom'
 import { useIconStyle } from '../icons/IconStyleContext'
 import { LoginButton, SettingsButton } from '@degenerates/ui'
 import styles from './index.module.scss'
@@ -34,6 +35,13 @@ const Settings: React.FC<SettingsProps> = ({ onClose }) => {
             Anime
           </button>
         </div>
+      </div>
+
+      <div className={styles.section}>
+        <h3 className={styles.sectionTitle}>服务器</h3>
+        <Link to="/server-manager" className={styles.managerLink}>
+          管理游戏下载与更新
+        </Link>
       </div>
 
       <LoginButton mode="full" />
