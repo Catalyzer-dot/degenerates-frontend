@@ -4,7 +4,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
-$ManagerVersion = '1.0.6'
+$ManagerVersion = '1.0.7'
 $configPath = Join-Path $PSScriptRoot 'steamcmd-manager.json'
 $logDir = Join-Path $PSScriptRoot 'steamcmd-manager-logs'
 $script:steamProcess = $null
@@ -131,7 +131,7 @@ function Public-State {
             if ($script:serverProcesses.ContainsKey([int]$_.appId)) { $process = Get-Process -Id $script:serverProcesses[[int]$_.appId] -ErrorAction SilentlyContinue }
             $executable = $null
             if ($process) { $executable = $process.Path }
-            [pscustomobject]@{ appId = $_.appId; name = $_.name; folder = $_.folder; running = ($null -ne $process); executable = $executable }
+            [pscustomobject]@{ appId = $_.appId; name = $_.name; folder = $_.folder; running = ($null -ne $process); executable = $executable; configFile = $_.configFile }
         })
         job = $job
     }
@@ -156,10 +156,10 @@ function Send-Json($context, [int]$status, $value) {
 }
 
 function Read-Body($request) {
-    if ($request.ContentLength64 -gt 4096) { throw 'Request body is too large.' }
+    if ($request.ContentLength64 -gt 1048576) { throw 'Request body is too large.' }
     $reader = New-Object IO.StreamReader($request.InputStream, [Text.Encoding]::UTF8)
     $body = $reader.ReadToEnd()
-    if ($body.Length -gt 4096) { throw 'Request body is too large.' }
+    if ($body.Length -gt 1048576) { throw 'Request body is too large.' }
     if ([string]::IsNullOrWhiteSpace($body)) { throw 'Request body is empty.' }
     return $body | ConvertFrom-Json
 }
@@ -237,6 +237,29 @@ function Get-AppTarget([int]$appId) {
     if (-not $target.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Install folder is outside the configured root.' }
     if (-not (Test-Path -LiteralPath $target -PathType Container)) { throw 'Install folder does not exist. Download the server first.' }
     return @{ app = $app; target = $target }
+}
+
+function Get-ConfigPath([int]$appId) {
+    $resolved = Get-AppTarget $appId
+    $app = $resolved.app
+    if (-not $app.configFile) { throw '请先选择服务器配置文件。' }
+    $path = [IO.Path]::GetFullPath((Join-Path $resolved.target $app.configFile))
+    if (-not $path.StartsWith($resolved.target + '\', [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { throw '配置文件必须位于服务器安装目录内。' }
+    return @{ app = $app; target = $resolved.target; path = $path }
+}
+
+function Browse-Config([int]$appId) {
+    $resolved = Get-AppTarget $appId
+    Add-Type -AssemblyName System.Windows.Forms
+    $dialog = New-Object Windows.Forms.OpenFileDialog
+    $dialog.InitialDirectory = $resolved.target
+    $dialog.Filter = '配置文件|*.ini;*.cfg;*.json;*.xml;*.yaml;*.yml;*.toml;*.txt|所有文件|*.*'
+    if ($dialog.ShowDialog() -ne [Windows.Forms.DialogResult]::OK) { return $null }
+    $path = [IO.Path]::GetFullPath($dialog.FileName)
+    if (-not $path.StartsWith($resolved.target + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '配置文件必须位于服务器安装目录内。' }
+    $resolved.app.configFile = $path.Substring($resolved.target.Length + 1)
+    Save-Config
+    return $resolved.app.configFile
 }
 
 function Start-Server([int]$appId) {
@@ -398,6 +421,17 @@ try {
             } elseif ($path -match '^/api/apps/([1-9][0-9]*)/restart$' -and $request.HttpMethod -eq 'POST') {
                 Stop-Server ([int]$Matches[1])
                 Start-Server ([int]$Matches[1])
+                Send-Json $context 200 (Public-State)
+            } elseif ($path -match '^/api/apps/([1-9][0-9]*)/config/browse$' -and $request.HttpMethod -eq 'GET') {
+                Send-Json $context 200 @{ path = Browse-Config ([int]$Matches[1]) }
+            } elseif ($path -match '^/api/apps/([1-9][0-9]*)/config$' -and $request.HttpMethod -eq 'GET') {
+                $config = Get-ConfigPath ([int]$Matches[1])
+                Send-Json $context 200 @{ file = $config.app.configFile; content = [IO.File]::ReadAllText($config.path, [Text.Encoding]::UTF8) }
+            } elseif ($path -match '^/api/apps/([1-9][0-9]*)/config$' -and $request.HttpMethod -eq 'PUT') {
+                $config = Get-ConfigPath ([int]$Matches[1])
+                $body = Read-Body $request
+                if ([string]$body.content -and ([string]$body.content).Length -gt 1048576) { throw 'Configuration file is too large.' }
+                [IO.File]::WriteAllText($config.path, [string]$body.content, [Text.UTF8Encoding]::new($false))
                 Send-Json $context 200 (Public-State)
             } else {
                 Send-Json $context 404 @{ error = 'Unknown endpoint.' }

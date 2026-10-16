@@ -10,6 +10,9 @@ import {
   startServerApp,
   stopServerApp,
   restartServerApp,
+  browseServerConfig,
+  readServerConfig,
+  saveServerConfig,
   setManagerToken,
   updateServerApp,
   browseManagerPath,
@@ -18,7 +21,7 @@ import {
 import styles from './index.module.scss'
 
 const jobLabels = { running: '正在下载或更新', succeeded: '更新完成', failed: '更新失败' }
-const managerDownloadVersion = '1.0.6'
+const managerDownloadVersion = '1.0.7'
 const managerDownloadFile = `steamcmd-manager-v${managerDownloadVersion}.zip`
 
 export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) {
@@ -30,6 +33,9 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
   const [name, setName] = useState('')
   const [appId, setAppId] = useState('')
   const [folder, setFolder] = useState('')
+  const [editingConfig, setEditingConfig] = useState<number | null>(null)
+  const [configFile, setConfigFile] = useState('')
+  const [configContent, setConfigContent] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -143,6 +149,29 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
       setName('')
       setAppId('')
       setFolder('')
+    }
+  }
+
+  async function openConfig(appId: number) {
+    try {
+      const result = await readServerConfig(appId)
+      setEditingConfig(appId)
+      setConfigFile(result.file)
+      setConfigContent(result.content)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '无法读取配置文件')
+    }
+  }
+
+  async function chooseConfig(appId: number) {
+    try {
+      const result = await browseServerConfig(appId)
+      if (result.path) {
+        await refresh()
+        await openConfig(appId)
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '无法选择配置文件')
     }
   }
 
@@ -403,6 +432,55 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
                   {app.running ? '● 服务运行中' : '○ 服务未运行'}
                   {app.executable ? ` · ${app.executable}` : ''}
                 </p>
+                <div className={styles.configRow}>
+                  <span>配置：{app.configFile || '未选择'}</span>
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    disabled={busy}
+                    onClick={() => void chooseConfig(app.appId)}
+                  >
+                    选择配置
+                  </button>
+                  {app.configFile && (
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      disabled={busy}
+                      onClick={() => void openConfig(app.appId)}
+                    >
+                      编辑配置
+                    </button>
+                  )}
+                </div>
+                {editingConfig === app.appId && (
+                  <div className={styles.configEditor}>
+                    <strong>{configFile}</strong>
+                    <textarea
+                      value={configContent}
+                      onChange={(event) => setConfigContent(event.target.value)}
+                      spellCheck={false}
+                    />
+                    <div className={styles.actions}>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(() => saveServerConfig(app.appId, configContent), '配置已保存')
+                        }
+                      >
+                        保存配置
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={() => setEditingConfig(null)}
+                      >
+                        关闭
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {state.job?.appId === app.appId && <p>最近任务：{jobLabels[state.job.status]}</p>}
               </article>
             ))}

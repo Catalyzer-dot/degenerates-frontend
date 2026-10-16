@@ -7,6 +7,7 @@ export interface ServerApp {
   folder: string
   running?: boolean
   executable?: string
+  configFile?: string
 }
 
 export interface ServerJob {
@@ -97,3 +98,13 @@ export const stopServerApp = (appId: number) =>
 
 export const restartServerApp = (appId: number) =>
   request<ManagerState>(`/apps/${appId}/restart`, { method: 'POST' })
+
+export const browseServerConfig = (appId: number) =>
+  request<{ path: string | null }>(`/apps/${appId}/config/browse`)
+export const readServerConfig = (appId: number) =>
+  request<{ file: string; content: string }>(`/apps/${appId}/config`)
+export const saveServerConfig = (appId: number, content: string) =>
+  request<ManagerState>(`/apps/${appId}/config`, {
+    method: 'PUT',
+    body: JSON.stringify({ content }),
+  })
