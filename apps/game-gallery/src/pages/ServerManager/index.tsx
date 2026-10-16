@@ -65,6 +65,12 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
     return () => window.clearInterval(timer)
   }, [paired, busy, refresh])
 
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(() => setNotice(''), 3500)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+
   async function pair(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setManagerToken(tokenInput)
@@ -215,85 +221,102 @@ export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) 
             </button>
           </div>
 
-          <form className={styles.form} onSubmit={(event) => void saveSettings(event)}>
-            <h2>安装目录</h2>
-            <label>
-              SteamCMD 路径
-              <div className={styles.pathInput}>
-                <input
-                  value={steamCmdPath}
-                  onChange={(event) => setSteamCmdPath(event.target.value)}
-                  placeholder="自动识别，或选择 steamcmd.exe"
-                />
-                <button
-                  type="button"
-                  className={styles.browseButton}
-                  onClick={() => void browse('steamcmd', setSteamCmdPath)}
-                >
-                  浏览
+          <div className={styles.tools}>
+            <div className={styles.popoverTool}>
+              <button type="button" className={styles.toolButton}>
+                安装目录
+              </button>
+              <form
+                className={`${styles.form} ${styles.popover}`}
+                onSubmit={(event) => void saveSettings(event)}
+              >
+                <h2>安装目录</h2>
+                <label>
+                  SteamCMD 路径
+                  <div className={styles.pathInput}>
+                    <input
+                      value={steamCmdPath}
+                      onChange={(event) => setSteamCmdPath(event.target.value)}
+                      placeholder="自动识别，或选择 steamcmd.exe"
+                    />
+                    <button
+                      type="button"
+                      className={styles.browseButton}
+                      onClick={() => void browse('steamcmd', setSteamCmdPath)}
+                    >
+                      浏览
+                    </button>
+                  </div>
+                </label>
+                <label>
+                  游戏安装根目录
+                  <div className={styles.pathInput}>
+                    <input
+                      value={installRoot}
+                      onChange={(event) => setInstallRoot(event.target.value)}
+                      placeholder="自动识别，或选择 steamapps\\common"
+                    />
+                    <button
+                      type="button"
+                      className={styles.browseButton}
+                      onClick={() => void browse('folder', setInstallRoot)}
+                    >
+                      浏览
+                    </button>
+                  </div>
+                </label>
+                <button type="submit" disabled={busy || state?.job?.status === 'running'}>
+                  保存目录
                 </button>
-              </div>
-            </label>
-            <label>
-              游戏安装根目录
-              <div className={styles.pathInput}>
-                <input
-                  value={installRoot}
-                  onChange={(event) => setInstallRoot(event.target.value)}
-                  placeholder="自动识别，或选择 steamapps\\common"
-                />
-                <button
-                  type="button"
-                  className={styles.browseButton}
-                  onClick={() => void browse('folder', setInstallRoot)}
-                >
-                  浏览
+              </form>
+            </div>
+            <div className={styles.popoverTool}>
+              <button type="button" className={styles.toolButton}>
+                添加服务器
+              </button>
+              <form
+                className={`${styles.form} ${styles.popover}`}
+                onSubmit={(event) => void saveApp(event)}
+              >
+                <h2>添加游戏服务器</h2>
+                <label>
+                  游戏名称
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    maxLength={100}
+                    placeholder="可选，下载后自动识别"
+                  />
+                </label>
+                <label>
+                  专用服务器 App ID
+                  <input
+                    value={appId}
+                    onChange={(event) => setAppId(event.target.value)}
+                    required
+                    inputMode="numeric"
+                    placeholder="2278520"
+                  />
+                </label>
+                <label>
+                  安装文件夹名
+                  <input
+                    value={folder}
+                    onChange={(event) => setFolder(event.target.value)}
+                    maxLength={64}
+                    placeholder="可选，下载后自动识别"
+                  />
+                </label>
+                <p className={styles.hint}>
+                  只填写 App ID 即可下载；名称和文件夹会从 Steam
+                  下载结果自动识别。已有存档可手动填写文件夹名；更新前先关闭游戏服务器。
+                </p>
+                <button type="submit" disabled={busy}>
+                  保存游戏
                 </button>
-              </div>
-            </label>
-            <button type="submit" disabled={busy || state?.job?.status === 'running'}>
-              保存目录
-            </button>
-          </form>
-
-          <form className={styles.form} onSubmit={(event) => void saveApp(event)}>
-            <h2>添加游戏服务器</h2>
-            <label>
-              游戏名称
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={100}
-                placeholder="可选，下载后自动识别"
-              />
-            </label>
-            <label>
-              专用服务器 App ID
-              <input
-                value={appId}
-                onChange={(event) => setAppId(event.target.value)}
-                required
-                inputMode="numeric"
-                placeholder="2278520"
-              />
-            </label>
-            <label>
-              安装文件夹名
-              <input
-                value={folder}
-                onChange={(event) => setFolder(event.target.value)}
-                maxLength={64}
-                placeholder="可选，下载后自动识别"
-              />
-            </label>
-            <p className={styles.hint}>
-              只填写 App ID 即可下载；名称和文件夹会从 Steam
-              下载结果自动识别。已有存档可手动填写文件夹名；更新前先关闭游戏服务器。
-            </p>
-            <button type="submit" disabled={busy}>
-              保存游戏
-            </button>
-          </form>
+              </form>
+            </div>
+          </div>
 
           <section className={styles.list} aria-label="已保存的游戏服务器">
             <h2>已保存的服务器</h2>

@@ -55,6 +55,45 @@
   gap: 1rem;
   margin: 2rem 0;
 }
+.tools {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem;
+}
+.popoverTool {
+  position: relative;
+}
+.toolButton {
+  padding: 0.6rem 0.9rem;
+  border: 1px solid rgba(124, 58, 237, 0.45);
+  border-radius: 8px;
+  background: rgba(20, 20, 40, 0.85);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  display: grid;
+  width: min(430px, calc(100vw - 2.5rem));
+  margin: 0;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    visibility 0.15s;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+.popoverTool:hover .popover,
+.popoverTool:focus-within .popover {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
 .form h2 {
   margin: 0;
 }
@@ -170,6 +209,9 @@
   background: #164d3a;
 }
 @media (max-width: 600px) {
+  .tools {
+    flex-wrap: wrap;
+  }
   .download {
     align-items: flex-start;
     flex-direction: column;
