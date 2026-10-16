@@ -37,9 +37,9 @@ function Save-Config {
     $tmp = "$configPath.tmp"
     [IO.File]::WriteAllText($tmp, $json, [Text.UTF8Encoding]::new($false))
     if (Test-Path -LiteralPath $configPath) {
-        [IO.File]::Replace($tmp, $configPath, $null)
+        Move-Item -LiteralPath $tmp -Destination $configPath -Force
     } else {
-        [IO.File]::Move($tmp, $configPath)
+        Move-Item -LiteralPath $tmp -Destination $configPath
     }
 }
 
