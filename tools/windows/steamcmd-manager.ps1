@@ -4,7 +4,7 @@
 )
 
 $ErrorActionPreference = 'Stop'
-$ManagerVersion = '1.0.7'
+$ManagerVersion = '1.0.8'
 $configPath = Join-Path $PSScriptRoot 'steamcmd-manager.json'
 $logDir = Join-Path $PSScriptRoot 'steamcmd-manager-logs'
 $script:steamProcess = $null
@@ -253,7 +253,7 @@ function Browse-Config([int]$appId) {
     Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object Windows.Forms.OpenFileDialog
     $dialog.InitialDirectory = $resolved.target
-    $dialog.Filter = '配置文件|*.ini;*.cfg;*.json;*.xml;*.yaml;*.yml;*.toml;*.txt|所有文件|*.*'
+    $dialog.Filter = '配置文件|config;*.config;*.ini;*.cfg;*.json;*.xml;*.yaml;*.yml;*.toml;*.txt|所有文件|*.*'
     if ($dialog.ShowDialog() -ne [Windows.Forms.DialogResult]::OK) { return $null }
     $path = [IO.Path]::GetFullPath($dialog.FileName)
     if (-not $path.StartsWith($resolved.target + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '配置文件必须位于服务器安装目录内。' }
