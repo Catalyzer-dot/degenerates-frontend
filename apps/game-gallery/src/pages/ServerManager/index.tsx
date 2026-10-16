@@ -18,7 +18,7 @@ const jobLabels = { running: '正在下载或更新', succeeded: '更新完成',
 const managerDownloadVersion = '1.0.4'
 const managerDownloadFile = `steamcmd-manager-v${managerDownloadVersion}.zip`
 
-export function ServerManagerPage() {
+export function ServerManagerPage({ embedded = false }: { embedded?: boolean }) {
   const [paired, setPaired] = useState(false)
   const [tokenInput, setTokenInput] = useState(getManagerToken)
   const [state, setState] = useState<ManagerState | null>(null)
@@ -126,13 +126,15 @@ export function ServerManagerPage() {
 
   return (
     <main className={styles.page}>
-      <header className={styles.header}>
-        <Link to="/" className={styles.back}>
-          ← 返回游戏库
-        </Link>
-        <h1>游戏服务器管理</h1>
-        <p>请在安装 SteamCMD 的 Windows 云服务器上打开此页。</p>
-      </header>
+      {!embedded && (
+        <header className={styles.header}>
+          <Link to="/" className={styles.back}>
+            ← 返回游戏库
+          </Link>
+          <h1>游戏服务器管理</h1>
+          <p>请在安装 SteamCMD 的 Windows 云服务器上打开此页。</p>
+        </header>
+      )}
 
       {error && (
         <p role="alert" className={styles.error}>

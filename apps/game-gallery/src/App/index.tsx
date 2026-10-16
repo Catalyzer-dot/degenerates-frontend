@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useRef, useCallback } from 'react'
-import { Link, Routes, Route } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import classNames from 'classnames'
 import { GameItem } from '../components/GameItem'
 import { SearchBar, type SearchResult } from '../components/SearchBar'
@@ -87,7 +87,7 @@ function HomePage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showSteamSearch, setShowSteamSearch] = useState(false)
-  const [mainTab, setMainTab] = useState<'steamgames' | 'playground'>('steamgames')
+  const [mainTab, setMainTab] = useState<'steamgames' | 'playground' | 'server'>('steamgames')
   const [activeTab, setActiveTab] = useState<'playing' | 'queueing' | 'completion'>('playing')
   const [statusCounts, setStatusCounts] = useState<Record<GameStatus, number>>({
     playing: 0,
@@ -628,9 +628,15 @@ function HomePage() {
           <PlaygroundIcon size={18} />
           Playground
         </button>
-        <Link to="/server-manager" className={styles.managerLink}>
-          服务器管理
-        </Link>
+        <button
+          onClick={() => setMainTab('server')}
+          className={classNames(styles.mainTab, {
+            [styles.mainTabActive]: mainTab === 'server',
+          })}
+        >
+          <PackageOpen size={18} />
+          服务器
+        </button>
       </div>
 
       {/* Status filters (only when Games tab active) */}
@@ -682,7 +688,18 @@ function HomePage() {
       )}
 
       <main>
-        {mainTab === 'playground' ? (
+        {mainTab === 'server' ? (
+          <Suspense
+            fallback={
+              <div className={styles.loadingContainer}>
+                <Loader2 className={`${styles.loaderIcon} animate-spin`} size={32} />
+                <div className={styles.mt1}>加载中...</div>
+              </div>
+            }
+          >
+            <ServerManagerPage embedded />
+          </Suspense>
+        ) : mainTab === 'playground' ? (
           <Suspense
             fallback={
               <div className={styles.loadingContainer}>
